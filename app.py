@@ -1,5 +1,3 @@
-# app.py
-
 import os
 import json
 import streamlit as st
@@ -9,11 +7,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from io import StringIO
 import traceback
-
-# --- Local Imports ---
 import finance_toolkit as ftk
 
-# --- LangChain & AI Imports ---
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain.chains import RetrievalQA
@@ -26,32 +21,23 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
     st.warning("LangChain libraries not available. Chat functionality will be disabled.")
 
-# --- Page Configuration ---
-st.set_page_config(page_title="💸 FinBuddy AI Pro", layout="wide")
+st.set_page_config(page_title="ArthShastraAI", layout="wide")
 
-# --- Security Note & API Key Configuration ---
-
-# For production, use Streamlit Secrets: https://docs.streamlit.io/library/advanced-features/secrets-management
-# WARNING: Never expose your API key in public code. Use secrets or environment variables for production.
-GEMINI_API_KEY = "AIzaSyC4SsTBnhiKmqvbkcZNdhTbQ5nuXQlVvjk"
+GEMINI_API_KEY = "YOUR API KEY"
 
 os.environ['GOOGLE_API_KEY'] = GEMINI_API_KEY
 
-# --- File Paths for Local Storage ---
 DATA_DIR = "data"
 VECTOR_STORE_PATH = os.path.join(DATA_DIR, "faiss_index")
 CHAT_HISTORY_PATH = os.path.join(DATA_DIR, "chat_history.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# --- AI and Data Loading (Cached for Performance) ---
 @st.cache_resource
 def load_ai_resources():
-    """Loads LLM and embedding models once."""
     if not LANGCHAIN_AVAILABLE or not GEMINI_API_KEY:
         return None, None
-    
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.6)
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.6)
         embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         return llm, embedding_model
     except Exception as e:
@@ -60,20 +46,15 @@ def load_ai_resources():
 
 @st.cache_resource
 def load_vector_store(_embedding_model):
-    """
-    Loads FAISS vector store from local disk, or creates a new one.
-    """
     if not _embedding_model:
         return None
-        
     required_file = os.path.join(VECTOR_STORE_PATH, "index.faiss")
-    
     try:
         if os.path.exists(required_file):
             return FAISS.load_local(VECTOR_STORE_PATH, _embedding_model, allow_dangerous_deserialization=True)
         else:
             st.info("Knowledge base not found. Creating a new one...")
-            placeholder_texts = ["Welcome to FinBuddy! You can add text documents to the knowledge base in the 'Upload Knowledge' section."]
+            placeholder_texts = ["Welcome to ArthShastraAI! You can add text documents to the knowledge base in the 'Upload Knowledge' section."]
             new_index = FAISS.from_texts(placeholder_texts, _embedding_model)
             new_index.save_local(VECTOR_STORE_PATH)
             return new_index
@@ -82,7 +63,6 @@ def load_vector_store(_embedding_model):
         return None
 
 def load_chat_history():
-    """Loads chat history from a local JSON file."""
     if os.path.exists(CHAT_HISTORY_PATH):
         try:
             with open(CHAT_HISTORY_PATH, 'r') as f:
@@ -92,17 +72,14 @@ def load_chat_history():
     return []
 
 def save_chat_history(history):
-    """Saves chat history to a local JSON file."""
     try:
         with open(CHAT_HISTORY_PATH, 'w') as f:
             json.dump(history, f, indent=2)
     except Exception as e:
         st.error(f"Error saving chat history: {e}")
 
-# --- Initialize models and data in session state ---
 if LANGCHAIN_AVAILABLE and GEMINI_API_KEY:
     llm, embedding_model = load_ai_resources()
-    
     if 'vector_store' not in st.session_state:
         st.session_state.vector_store = load_vector_store(embedding_model)
     if 'chat_history' not in st.session_state:
@@ -110,15 +87,12 @@ if LANGCHAIN_AVAILABLE and GEMINI_API_KEY:
 else:
     llm, embedding_model = None, None
 
-# --- Core Application Functions ---
 def detect_data_frequency(df_index):
-    """Helper function to detect and display data frequency"""
     periods_per_year = ftk.detect_frequency(pd.Series(index=df_index))
     freq_map = {252: "Daily", 52: "Weekly", 12: "Monthly", 4: "Quarterly", 1: "Annual"}
     return freq_map.get(periods_per_year, "Unknown"), periods_per_year
 
 def general_csv_preprocessor(df):
-    """Guides the user to select correct columns for analysis from an uploaded CSV."""
     st.write("#### 1. Data Preview")
     st.dataframe(df.head(10))
     st.info("Please ensure your CSV has clear headers for each column.")
@@ -126,9 +100,7 @@ def general_csv_preprocessor(df):
     st.write("#### 2. Configure Your Data")
     col1, col2 = st.columns(2)
     
-    # Date column selection
-    date_col = col1.selectbox("Select the column containing dates", 
-                             [''] + list(df.columns))
+    date_col = col1.selectbox("Select the column containing dates", [''] + list(df.columns))
     if not date_col:
         st.warning("Please select a date column.")
         return None, None
@@ -141,37 +113,32 @@ def general_csv_preprocessor(df):
         
     df_sorted = df.set_index(date_col).sort_index()
     
-    # Detect frequency
     freq_name, periods_per_year = detect_data_frequency(df_sorted.index)
     st.info(f"📅 Detected data frequency: **{freq_name}** ({periods_per_year} periods per year)")
 
-    # Asset column selection
     potential_asset_cols = [col for col in df_sorted.columns if pd.api.types.is_numeric_dtype(df_sorted[col])]
     if not potential_asset_cols:
         st.error("No numeric columns found for analysis.")
         return None, None
         
     asset_cols = col2.multiselect("Select asset/ticker columns (containing prices/values)", 
-                                 potential_asset_cols, 
-                                 default=potential_asset_cols[:min(10, len(potential_asset_cols))])
+                                  potential_asset_cols, 
+                                  default=potential_asset_cols[:min(10, len(potential_asset_cols))])
     if not asset_cols:
         st.warning("Please select at least one asset column.")
         return None, None
     
-    # Data processing options
     st.write("#### 3. Data Processing Options")
     col3, col4 = st.columns(2)
     
     fill_method = col3.selectbox("Handle missing values:", 
-                                ["Forward fill", "Drop rows", "Linear interpolation"])
+                                 ["Forward fill", "Drop rows", "Linear interpolation"])
     
     return_type = col4.selectbox("Return calculation:", 
-                                ["Simple returns", "Log returns"])
+                                 ["Simple returns", "Log returns"])
     
-    # Process the data
     prices_df = df_sorted[asset_cols].copy()
     
-    # Handle missing values
     if fill_method == "Forward fill":
         prices_df = prices_df.ffill()
     elif fill_method == "Linear interpolation":
@@ -183,10 +150,9 @@ def general_csv_preprocessor(df):
         st.error("No data remaining after processing missing values.")
         return None, None
     
-    # Calculate returns
     if return_type == "Simple returns":
         returns_df = prices_df.pct_change().dropna()
-    else:  # Log returns
+    else:
         returns_df = np.log(prices_df / prices_df.shift(1)).dropna()
     
     st.write("#### 4. Processed Returns Data")
@@ -200,9 +166,6 @@ def general_csv_preprocessor(df):
     return returns_df, periods_per_year
 
 def create_visualizations(returns_df, summary_stats, periods_per_year):
-    """Create comprehensive visualizations for the portfolio analysis"""
-    
-    # 1. Performance Chart
     st.subheader("📈 Cumulative Performance")
     cumulative_returns = (1 + returns_df).cumprod()
     
@@ -216,19 +179,18 @@ def create_visualizations(returns_df, summary_stats, periods_per_year):
     plt.tight_layout()
     st.pyplot(fig1)
     
-    # 2. Risk-Return Scatter
     st.subheader("📊 Risk-Return Analysis")
     fig2, ax2 = plt.subplots(figsize=(10, 6))
-    scatter = ax2.scatter(summary_stats['Annualized Vol'], 
-                         summary_stats['Annualized Return'],
-                         s=100, alpha=0.7, c=summary_stats['Sharpe Ratio'], 
-                         cmap='viridis')
+    scatter = ax2.scatter(summary_stats['Annualized Vol'],
+                          summary_stats['Annualized Return'],
+                          s=100, alpha=0.7, c=summary_stats['Sharpe Ratio'], 
+                          cmap='viridis')
     
     for i, asset in enumerate(summary_stats.index):
         ax2.annotate(asset, 
-                    (summary_stats.iloc[i]['Annualized Vol'], 
-                     summary_stats.iloc[i]['Annualized Return']),
-                    xytext=(5, 5), textcoords='offset points')
+                     (summary_stats.iloc[i]['Annualized Vol'], 
+                      summary_stats.iloc[i]['Annualized Return']),
+                     xytext=(5, 5), textcoords='offset points')
     
     ax2.set_xlabel("Annualized Volatility")
     ax2.set_ylabel("Annualized Return")
@@ -237,7 +199,6 @@ def create_visualizations(returns_df, summary_stats, periods_per_year):
     ax2.grid(True, alpha=0.3)
     st.pyplot(fig2)
     
-    # 3. Correlation Heatmap
     st.subheader("🔗 Asset Correlation Matrix")
     correlation_matrix = returns_df.corr()
     fig3, ax3 = plt.subplots(figsize=(10, 8))
@@ -246,9 +207,8 @@ def create_visualizations(returns_df, summary_stats, periods_per_year):
     ax3.set_title("Asset Correlation Matrix")
     st.pyplot(fig3)
     
-    # 4. Rolling Volatility
     st.subheader("📉 Rolling Risk Analysis")
-    window = min(max(len(returns_df) // 10, 10), 60)  # Adaptive window
+    window = min(max(len(returns_df) // 10, 10), 60)
     rolling_vol = returns_df.rolling(window=window).std() * np.sqrt(periods_per_year)
     
     fig4, ax4 = plt.subplots(figsize=(12, 6))
@@ -262,14 +222,11 @@ def create_visualizations(returns_df, summary_stats, periods_per_year):
     st.pyplot(fig4)
 
 def analyze_portfolio_pro(returns_df, riskfree_rate=0.03):
-    """Performs comprehensive portfolio analysis using the finance_toolkit."""
     try:
-        # Calculate all statistics
         summary = ftk.summary_stats(returns_df, riskfree_rate=riskfree_rate)
         er = ftk.annualize_rets(returns_df)
-        cov = returns_df.cov() * ftk.detect_frequency(returns_df)  # Annualized covariance
+        cov = returns_df.cov() * ftk.detect_frequency(returns_df)
         
-        # Generate insights
         insights = ftk.generate_portfolio_insights(returns_df, summary)
         
         return summary, er, cov, insights
@@ -279,11 +236,9 @@ def analyze_portfolio_pro(returns_df, riskfree_rate=0.03):
         return None, None, None, []
 
 def get_portfolio_advice_pro(summary_df, insights_list, returns_df):
-    """Uses the LLM to generate advice based on the detailed summary statistics."""
     if not llm:
         return generate_basic_advice(summary_df, insights_list)
     
-    # Create a comprehensive prompt
     prompt_template = """
     You are an expert financial advisor analyzing a portfolio. Based on the following data, provide detailed investment insights and recommendations.
 
@@ -310,14 +265,13 @@ def get_portfolio_advice_pro(summary_df, insights_list, returns_df):
     Format your response in clear sections with bullet points where appropriate. Be specific and reference the actual numbers from the data.
     """
     
-    # Prepare context data
     insights_text = "\n".join([f"• {insight}" for insight in insights_list])
     
     try:
         prompt = PromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         
-        with st.spinner("🤖 Gemini is generating detailed analysis..."):
+        with st.spinner("ArthShastraAI is generating detailed analysis..."):
             advice = chain.invoke({
                 "summary_markdown": summary_df.to_markdown(),
                 "insights": insights_text,
@@ -334,10 +288,8 @@ def get_portfolio_advice_pro(summary_df, insights_list, returns_df):
         return generate_basic_advice(summary_df, insights_list)
 
 def generate_basic_advice(summary_df, insights_list):
-    """Generate basic advice when AI is not available"""
     advice = "## Portfolio Analysis Summary\n\n"
     
-    # Performance insights
     best_return = summary_df['Annualized Return'].max()
     worst_return = summary_df['Annualized Return'].min()
     avg_return = summary_df['Annualized Return'].mean()
@@ -347,7 +299,6 @@ def generate_basic_advice(summary_df, insights_list):
     advice += f"- Best performing asset return: {best_return:.2%}\n"
     advice += f"- Worst performing asset return: {worst_return:.2%}\n\n"
     
-    # Risk insights
     avg_vol = summary_df['Annualized Vol'].mean()
     max_vol = summary_df['Annualized Vol'].max()
     avg_sharpe = summary_df['Sharpe Ratio'].mean()
@@ -357,7 +308,6 @@ def generate_basic_advice(summary_df, insights_list):
     advice += f"- Maximum volatility: {max_vol:.2%}\n"
     advice += f"- Average Sharpe ratio: {avg_sharpe:.3f}\n\n"
     
-    # Key insights
     advice += "### Key Insights\n"
     for insight in insights_list:
         advice += f"- {insight}\n"
@@ -374,14 +324,11 @@ def generate_basic_advice(summary_df, insights_list):
     return advice
 
 def create_efficient_frontier_analysis(er, cov, riskfree_rate=0.03):
-    """Create efficient frontier analysis with optimal portfolios"""
     try:
-        # Calculate optimal portfolios
         w_msr = ftk.msr(riskfree_rate, er, cov)
         w_gmv = ftk.gmv(cov)
         w_ew = np.repeat(1/len(er), len(er))
         
-        # Calculate portfolio metrics
         portfolios = {
             'Maximum Sharpe Ratio': {
                 'weights': w_msr,
@@ -409,11 +356,10 @@ def create_efficient_frontier_analysis(er, cov, riskfree_rate=0.03):
         st.error(f"Error in efficient frontier analysis: {e}")
         return None
 
-# --- Streamlit UI ---
-st.title("💸 FinBuddy AI Pro: Portfolio & Financial Analysis")
+st.title("ArthShastraAI: Portfolio & Financial Analysis")
 st.markdown("### Your Comprehensive Financial Analysis Assistant")
 
-st.sidebar.title("🔍 FinBuddy Navigation")
+st.sidebar.title("🔍 ArthShastraAI Navigation")
 mode = st.sidebar.radio("Choose a mode:", [
     "📈 Portfolio Optimizer Pro",
     "💬 Ask Anything (Q&A)",
@@ -421,18 +367,17 @@ mode = st.sidebar.radio("Choose a mode:", [
 ])
 
 st.sidebar.markdown("---")
-if not GEMINI_API_KEY:
+if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR API KEY":
     st.sidebar.warning("⚠️ Enter your Gemini API key to enable AI chat features")
 else:
     st.sidebar.success("✅ AI features enabled")
 
 st.sidebar.info("💡 This app uses local storage for chat history and knowledge base.")
 
-# Main application logic
 if mode == "📈 Portfolio Optimizer Pro":
     st.header("📈 Portfolio Optimizer Pro")
     st.markdown("""
-    Upload a CSV file with your portfolio's historical data. FinBuddy will:
+    Upload a CSV file with your portfolio's historical data. ArthShastraAI will:
     - Auto-detect data frequency (daily, weekly, monthly)
     - Calculate comprehensive risk metrics
     - Generate visualizations and insights
@@ -440,28 +385,24 @@ if mode == "📈 Portfolio Optimizer Pro":
     """)
     
     uploaded_file = st.file_uploader("Choose your portfolio CSV file", 
-                                   type="csv",
-                                   help="CSV should contain a date column and numeric price/value columns")
+                                     type="csv",
+                                     help="CSV should contain a date column and numeric price/value columns")
     
     if uploaded_file:
         try:
-            # Load and preview data
             df = pd.read_csv(uploaded_file)
             st.success(f"✅ Successfully loaded {len(df)} rows and {len(df.columns)} columns")
             
-            # Process data
             result = general_csv_preprocessor(df)
-            if result[0] is not None:
+            if result and result[0] is not None:
                 returns_df, periods_per_year = result
                 
-                # Perform analysis
                 with st.spinner("🔄 Running comprehensive portfolio analysis..."):
                     analysis_result = analyze_portfolio_pro(returns_df)
                     
                 if analysis_result and analysis_result[0] is not None:
                     summary_stats, expected_returns, cov_matrix, insights = analysis_result
                     
-                    # Display results in tabs
                     tab1, tab2, tab3, tab4, tab5 = st.tabs([
                         "📊 Summary Stats", 
                         "📈 Visualizations", 
@@ -473,7 +414,6 @@ if mode == "📈 Portfolio Optimizer Pro":
                     with tab1:
                         st.subheader("📊 Portfolio Summary Statistics")
                         
-                        # Format the summary stats for better display
                         formatted_summary = summary_stats.copy()
                         percentage_cols = ['Annualized Return', 'Annualized Vol', 'Cornish-Fisher VaR (5%)', 
                                          'Historic CVaR (5%)', 'Max Drawdown']
@@ -491,7 +431,6 @@ if mode == "📈 Portfolio Optimizer Pro":
                         
                         st.dataframe(formatted_summary, use_container_width=True)
                         
-                        # Quick insights
                         col1, col2, col3, col4 = st.columns(4)
                         with col1:
                             best_return = summary_stats['Annualized Return'].max()
@@ -514,16 +453,13 @@ if mode == "📈 Portfolio Optimizer Pro":
                         ai_advice = get_portfolio_advice_pro(summary_stats, insights, returns_df)
                         st.markdown(ai_advice)
                     
-
                     with tab4:
                         st.subheader("⚡ Efficient Frontier Analysis")
-                        # Create efficient frontier plot
                         fig, ax = plt.subplots(figsize=(12, 8))
-                        # Pass the 'ax' object to the function
                         ftk.plot_ef(n_points=25, 
                                     er=expected_returns, 
                                     cov=cov_matrix,
-                                    ax=ax,  # Pass the created axis here
+                                    ax=ax,
                                     show_cml=True, 
                                     show_ew=True, 
                                     show_gmv=True, 
@@ -531,7 +467,7 @@ if mode == "📈 Portfolio Optimizer Pro":
                         ax.set_title("Efficient Frontier with Optimal Portfolios", fontsize=16)
                         ax.set_xlabel("Annualized Volatility (Risk)", fontsize=12)
                         ax.set_ylabel("Annualized Return", fontsize=12)
-                        # Add legend manually for clarity
+                        
                         ax.plot([], [], 'o-', color='blue', label='Efficient Frontier')
                         ax.plot([], [], 'o', color='green', markersize=10, label='Maximum Sharpe Ratio')
                         ax.plot([], [], 'o', color='midnightblue', markersize=10, label='Global Min Volatility')
@@ -539,19 +475,23 @@ if mode == "📈 Portfolio Optimizer Pro":
                         ax.plot([], [], 'o--', color='green', label='Capital Market Line')
                         ax.legend()
                         ax.grid(True, alpha=0.3)
+                        
                         st.pyplot(fig)
-                        # Show optimal portfolio compositions
+                        
                         portfolios = create_efficient_frontier_analysis(expected_returns, cov_matrix)
                         if portfolios:
                             st.subheader("📋 Optimal Portfolio Compositions")
+                            
                             for name, portfolio in portfolios.items():
                                 with st.expander(f"{name} Portfolio"):
                                     col1, col2 = st.columns(2)
+                                    
                                     with col1:
                                         st.write("**Portfolio Metrics:**")
                                         st.write(f"Expected Return: {portfolio['return']:.2%}")
                                         st.write(f"Volatility: {portfolio['volatility']:.2%}")
                                         st.write(f"Sharpe Ratio: {portfolio['sharpe']:.3f}")
+                                    
                                     with col2:
                                         st.write("**Asset Allocation:**")
                                         weights_df = pd.DataFrame({
@@ -568,7 +508,6 @@ if mode == "📈 Portfolio Optimizer Pro":
                         for insight in insights:
                             st.write(f"• {insight}")
                         
-                        # Additional statistics
                         st.write("#### 📈 Additional Statistics:")
                         
                         col1, col2 = st.columns(2)
@@ -586,7 +525,6 @@ if mode == "📈 Portfolio Optimizer Pro":
                             st.write(f"• Average Sharpe ratio: {summary_stats['Sharpe Ratio'].mean():.3f}")
                             st.write(f"• Correlation range: {returns_df.corr().min().min():.3f} - {returns_df.corr().max().max():.3f}")
                         
-                        # Download button for results
                         csv_data = summary_stats.to_csv()
                         st.download_button(
                             label="📥 Download Analysis Results",
@@ -594,7 +532,6 @@ if mode == "📈 Portfolio Optimizer Pro":
                             file_name=f"portfolio_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
                             mime="text/csv"
                         )
-                
         except Exception as e:
             st.error(f"❌ An error occurred while processing your file: {str(e)}")
             st.error("Please check that your CSV file has the correct format with date and numeric columns.")
@@ -604,26 +541,22 @@ if mode == "📈 Portfolio Optimizer Pro":
 elif mode == "💬 Ask Anything (Q&A)":
     st.header("💬 Financial Q&A Assistant")
     
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR API KEY":
         st.warning("Please enter your Gemini API key in the sidebar to use the chat feature.")
     elif not LANGCHAIN_AVAILABLE:
         st.error("Required libraries are not installed. Please install langchain and related packages.")
     else:
-        # Display chat history
         for msg in st.session_state.chat_history:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
         
-        # Chat input
         if prompt := st.chat_input("Ask about finance, portfolio analysis, or uploaded documents..."):
-            # Add user message
             st.session_state.chat_history.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
             
-            # Generate response
             try:
-                with st.spinner("🤖 FinBuddy is thinking..."):
+                with st.spinner("ArthShastraAI is thinking..."):
                     if st.session_state.vector_store:
                         qa_chain = RetrievalQA.from_chain_type(
                             llm=llm,
@@ -633,7 +566,6 @@ elif mode == "💬 Ask Anything (Q&A)":
                         response = qa_chain.invoke({"query": prompt})
                         answer = response['result']
                     else:
-                        # Direct LLM response if no vector store
                         response = llm.invoke(prompt)
                         answer = response.content
                     
@@ -641,7 +573,6 @@ elif mode == "💬 Ask Anything (Q&A)":
                     with st.chat_message("assistant"):
                         st.markdown(answer)
                     
-                    # Save chat history
                     save_chat_history(st.session_state.chat_history)
                     
             except Exception as e:
@@ -650,7 +581,6 @@ elif mode == "💬 Ask Anything (Q&A)":
                 with st.chat_message("assistant"):
                     st.error(error_msg)
         
-        # Clear chat button
         if st.button("🗑️ Clear Chat History"):
             st.session_state.chat_history = []
             save_chat_history([])
@@ -659,12 +589,12 @@ elif mode == "💬 Ask Anything (Q&A)":
 elif mode == "📚 Upload Knowledge (RAG)":
     st.header("📚 Upload Knowledge for RAG")
     
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR API KEY":
         st.warning("Please enter your Gemini API key in the sidebar to use this feature.")
     elif not LANGCHAIN_AVAILABLE:
         st.error("Required libraries are not installed. Please install langchain and related packages.")
     else:
-        st.info("📖 Add text documents to FinBuddy's knowledge base. This information will be used to answer questions in the 'Ask Anything' mode.")
+        st.info("📖 Add text documents to ArthShastraAI's knowledge base. This information will be used to answer questions in the 'Ask Anything' mode.")
         
         uploaded_files = st.file_uploader(
             "Upload text files", 
@@ -676,7 +606,6 @@ elif mode == "📚 Upload Knowledge (RAG)":
         if uploaded_files:
             for file in uploaded_files:
                 try:
-                    # Handle different file types
                     if file.type == "text/csv":
                         df = pd.read_csv(file)
                         text_content = f"CSV File: {file.name}\nColumns: {', '.join(df.columns)}\nData Summary:\n{df.describe().to_string()}"
@@ -691,7 +620,6 @@ elif mode == "📚 Upload Knowledge (RAG)":
                         )
                         docs = text_splitter.split_text(text_content)
                         
-                        # Add documents to the vector store and save it
                         if st.session_state.vector_store:
                             st.session_state.vector_store.add_texts(docs)
                             st.session_state.vector_store.save_local(VECTOR_STORE_PATH)
@@ -701,19 +629,17 @@ elif mode == "📚 Upload Knowledge (RAG)":
                 except Exception as e:
                     st.error(f"❌ An error occurred with file '{file.name}': {e}")
         
-        # Show current knowledge base status
         if st.session_state.get('vector_store'):
             st.info("💾 Knowledge base is active and ready for queries!")
         else:
             st.warning("⚠️ No knowledge base found. Upload some documents to get started.")
 
-# Footer
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #666; padding: 20px;'>
-        💸 FinBuddy AI Pro - Your Comprehensive Financial Analysis Assistant<br>
-        Built with Streamlit • Powered by Google Gemini • Enhanced with Advanced Analytics
+        ArthShastraAI - Your Comprehensive Financial Analysis Assistant<br>
+        Built by Dhawal Khandelwal • with Streamlit • Powered by Google Gemini • Enhanced with Advanced Analytics
     </div>
     """, 
     unsafe_allow_html=True
