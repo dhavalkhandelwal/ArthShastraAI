@@ -1,132 +1,86 @@
-ArthShastraAI 💸
-An advanced, multimodal financial assistant that leverages Generative AI for deep portfolio analysis, risk assessment, and intelligent Q&A. This tool empowers users to upload their portfolio data, receive comprehensive quantitative analysis, and get AI-driven advice for optimization.
+# 💸 ArthShastraAI – Multimodal Financial Assistant
 
-🚀 Core Features
-Portfolio Optimizer Pro: Upload a CSV of historical asset prices to receive an in-depth analysis, including:
+**ArthShastraAI** is an advanced, multimodal financial assistant built to empower investors and learners with AI-driven portfolio optimization, risk analysis, and intelligent financial Q&A. This project was developed as a personal innovation to explore the intersection of **quantitative finance** and **Generative AI**.
 
-Automated data frequency detection (daily, weekly, monthly).
+> 🔬 Built for deep financial insight. Powered by AI.
 
-Comprehensive statistical summary tables.
+---
 
-Rich visualizations including cumulative returns, risk-return scatter plots, correlation heatmaps, and rolling volatility charts.
+## 🚀 Core Features
 
-Calculation and visualization of the Efficient Frontier with optimal portfolio compositions (Max Sharpe, Global Minimum Volatility).
+### 📈 Portfolio Optimizer Pro
 
-Intelligent Q&A Assistant: An AI-powered chatbot that can answer financial questions. It leverages a Retrieval-Augmented Generation (RAG) system to provide answers based on both its general knowledge and information from documents you upload.
+Upload a CSV of historical asset prices and get:
 
-Persistent Knowledge Base: Upload your own text documents (.txt, .md) to create a custom, persistent knowledge base. The AI assistant will use this information to provide more tailored answers.
+- 📊 Automated data frequency detection (daily/weekly/monthly)
+- 📋 Statistical summary tables
+- 📉 Rich visualizations:
+  - Cumulative Returns
+  - Risk-Return Scatter Plots
+  - Correlation Heatmaps
+  - Rolling Volatility Charts
+- 📌 Efficient Frontier with:
+  - Maximum Sharpe Ratio Portfolio
+  - Global Minimum Volatility Portfolio
 
-🧠 Key Concepts Implemented
-This project stands at the intersection of quantitative finance and cutting-edge artificial intelligence.
+### 🤖 Intelligent Q&A Assistant (RAG-powered)
 
-Financial Engineering & Quantitative Analysis
-Modern Portfolio Theory (MPT): Core concepts are used to calculate and visualize the Efficient Frontier, allowing for the identification of optimal portfolios.
+- Ask general financial questions or portfolio-specific queries
+- Upload `.txt` or `.md` files for context-aware answers
+- Backed by a **Retrieval-Augmented Generation (RAG)** system
 
-Risk & Return Metrics: Calculation of key performance indicators, including:
+### 📚 Persistent Knowledge Base
 
-Sharpe Ratio: For risk-adjusted return.
+- Documents you upload stay in a custom knowledge base
+- The assistant uses them for smarter, tailored responses
 
-Max Drawdown: To quantify potential downside risk.
+---
 
-Skewness & Kurtosis: To understand the shape and tail risk of the return distribution.
+## 🧠 Key Concepts Implemented
 
-Value at Risk (VaR): Including the Cornish-Fisher VaR, which accounts for non-normal distributions.
+### 🔢 Financial Engineering & Quantitative Analysis
 
-Conditional Value at Risk (CVaR): To measure the expected shortfall in the tail of the distribution.
+- **Modern Portfolio Theory (MPT)** – Efficient Frontier
+- **Risk & Return Metrics**:
+  - Sharpe Ratio
+  - Max Drawdown
+  - Skewness & Kurtosis
+  - Value at Risk (VaR) – includes Cornish-Fisher extension
+  - Conditional VaR (CVaR)
+- **Time Series Analysis** – Rolling volatility, Cumulative returns
+- **Correlation Analysis** – Heatmaps & diversification insights
 
-Time Series Analysis: Calculation of rolling volatility and cumulative returns to understand asset behavior over time.
+### 🧬 AI & NLP Concepts
 
-Correlation Analysis: Generation of correlation matrices to assess diversification within the portfolio.
+- **Large Language Models** – Google Gemini via LangChain
+- **RAG (Retrieval-Augmented Generation)** architecture
+- **Sentence Embeddings** – `all-MiniLM-L6-v2` from HuggingFace
+- **Vector Store** – FAISS for fast, local similarity search
+- **Prompt Engineering** – Financial-specific prompting
 
-AI & NLP Concepts
-Large Language Models (LLMs): Utilizes Google's Gemini model via LangChain for generating human-like analysis, summaries, and recommendations.
+---
 
-Retrieval-Augmented Generation (RAG): The Q&A system is built on a RAG architecture, which grounds the LLM's responses in specific, user-provided documents to reduce hallucinations and increase accuracy.
+## 🛠️ Tech Stack
 
-Sentence Embeddings: Employs advanced Transformer models (all-MiniLM-L6-v2) to convert text into meaningful vector representations for semantic understanding.
+| Layer         | Technologies                            |
+|---------------|------------------------------------------|
+| Frontend      | Streamlit                                |
+| AI/NLP        | LangChain, Gemini, SentenceTransformers  |
+| Data Analysis | Pandas, NumPy, SciPy                     |
+| Visuals       | Matplotlib, Seaborn                      |
+| Storage       | FAISS (vector database)                  |
 
-Tokenization: While handled implicitly by the embedding model, tokenization is a fundamental first step in the NLP pipeline used here to process all text inputs.
+---
 
-Vector Database: Uses FAISS (Facebook AI Similarity Search) as a high-speed, local vector store to index document embeddings and perform efficient similarity searches for the RAG system.
+## ⚙️ Setup and Installation
 
-Prompt Engineering: Carefully crafted prompts are used to instruct the LLM on how to analyze financial data and structure its advice professionally.
+### ✅ Prerequisites
 
-🛠️ Technology Stack
-Frontend: Streamlit
+- Python 3.10+
+- Git
 
-AI/LLM Framework: LangChain
+### 🔧 1. Clone the Repository
 
-Generative AI Model: Google Gemini
-
-Data Processing: Pandas, NumPy
-
-Visualization: Matplotlib, Seaborn
-
-NLP Embeddings: Sentence-Transformers (via HuggingFace)
-
-Vector Store: FAISS
-
-Financial Analysis: SciPy
-
-⚙️ Setup and Installation
-Follow these steps to get the application running locally.
-
-Prerequisites
-Python 3.10 or higher
-
-Git
-
-1. Clone the Repository
-Bash
-
+```bash
 git clone https://github.com/dhavalkhandelwal/ArthShastraAI.git
 cd ArthShastraAI
-2. Create and Activate a Virtual Environment
-On Windows:
-
-Bash
-
-python -m venv venv
-.\venv\Scripts\activate
-On macOS/Linux:
-
-Bash
-
-python3 -m venv venv
-source venv/bin/activate
-3. Install Dependencies
-Bash
-
-pip install -r requirements.txt
-4. Set Up Your API Key
-Open the app.py file in a code editor.
-
-Find the following line:
-
-Python
-
-GEMINI_API_KEY = "your_api_key_here"
-Replace "your_api_key_here" with your actual Google Gemini API key.
-
-
-5. Run the Application
-Bash
-
-streamlit run app.py
-The application should now be open and running in your web browser!
-
-📖 Usage
-Portfolio Optimizer Pro: Navigate to this mode and upload the provided comprehensive_portfolio.csv or your own CSV file containing historical price data. The app will automatically guide you through the analysis.
-
-Upload Knowledge (RAG): Go to this mode to upload .txt or .md files. This will add them to the AI's knowledge base.
-
-Ask Anything (Q&A): Use this chat interface to ask general financial questions or questions specifically about the documents you've uploaded.
-
-📂 Project Structure
-ArthShastraAI/
-├── data/                  # Local storage for session data
-│   ├── faiss_index/       # FAISS vector store for RAG
-│   └── chat_history.json  # Persistent chat logs
-├── finance_toolkit.py     # Module for all financial calculations
-├── app.py                 # Main Streamlit application file
-└── requirements.txt       # Python dependencies
