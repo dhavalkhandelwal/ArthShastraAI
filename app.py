@@ -87,6 +87,50 @@ if LANGCHAIN_AVAILABLE and GEMINI_API_KEY:
 else:
     llm, embedding_model = None, None
 
+def get_intelligent_answer(query, vector_store, llm):
+    """
+    Decides whether to answer from the knowledge base (RAG) or general knowledge.
+    """
+    # 1. First, try to retrieve relevant documents from the knowledge base
+    retriever = vector_store.as_retriever(search_kwargs={"k": 2})
+    relevant_docs = retriever.invoke(query)
+
+    # 2. Check if the retrieved documents are meaningful
+    # This simple check avoids using placeholder text as real context.
+    is_context_relevant = len(relevant_docs) > 0 and "Welcome to ArthShastraAI" not in relevant_docs[0].page_content
+
+    # 3. If context is relevant, use the RAG approach
+    if is_context_relevant:
+        context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
+        rag_prompt_template = """
+        You are ArthShastraAI. Answer the user's question based ONLY on the context provided below from their uploaded documents.
+
+        CONTEXT:
+        {context}
+
+        QUESTION:
+        {question}
+        """
+        prompt = PromptTemplate.from_template(rag_prompt_template)
+        chain = prompt | llm
+        return chain.invoke({"context": context_text, "question": query}).content
+    
+    # 4. If no relevant context, use the LLM's general knowledge
+    else:
+        general_prompt_template = """
+        You are ArthShastraAI, an expert financial educator and assistant. 
+        Your goal is to provide clear, insightful, and helpful answers to financial questions. 
+        You must provide definitions, explanations, and general financial tips. 
+        Do not refuse to answer financial questions by saying you are just an AI. Answer the user's question directly and helpfully.
+
+        QUESTION: {question}
+
+        ANSWER:
+        """
+        prompt = PromptTemplate.from_template(general_prompt_template)
+        chain = prompt | llm
+        return chain.invoke({"question": query}).content
+
 def detect_data_frequency(df_index):
     periods_per_year = ftk.detect_frequency(pd.Series(index=df_index))
     freq_map = {252: "Daily", 52: "Weekly", 12: "Monthly", 4: "Quarterly", 1: "Annual"}
@@ -557,24 +601,47 @@ elif mode == "💬 Ask Anything (Q&A)":
             
             try:
                 with st.spinner("ArthShastraAI is thinking..."):
-                    if st.session_state.vector_store:
-                        qa_chain = RetrievalQA.from_chain_type(
-                            llm=llm,
-                            chain_type="stuff",
-                            retriever=st.session_state.vector_store.as_retriever(search_kwargs={"k": 3})
-                        )
-                        response = qa_chain.invoke({"query": prompt})
-                        answer = response['result']
-                    else:
-                        response = llm.invoke(prompt)
-                        answer = response.content
+                    # Step 1: Always retrieve context from your documents
+                    retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": 2})
+                    relevant_docs = retriever.invoke(prompt)
+                    context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+                    # Step 2: Create a sophisticated prompt that tells the AI how to behave
+                    system_prompt = """
+                    You are ArthShastraAI, an expert financial educator and assistant. Your goal is to provide clear, insightful, and helpful answers to financial questions.
+                    You have been provided with a user's QUESTION and some CONTEXT retrieved from their personal documents.
+
+                    Follow these rules carefully:
+                    1. First, examine the CONTEXT. If it directly and sufficiently answers the user's QUESTION, use it to formulate your response.
+                    2. If the CONTEXT is irrelevant, insufficient, or does not contain the answer, you MUST IGNORE IT COMPLETELY.
+                    3. In that case, you MUST answer the user's QUESTION using your own extensive general financial knowledge.
+                    4. NEVER mention the context or the documents unless you are actively using information from them to answer. For example, do not say "The context does not contain the answer." or "Based on the documents...".
+                    5. Always be helpful and provide financial tips when appropriate. Do not refuse to answer a financial question by saying you are just an AI.
+
+                    CONTEXT:
+                    {context}
+
+                    QUESTION:
+                    {question}
+
+                    ANSWER:
+                    """
+                    
+                    prompt_template = PromptTemplate.from_template(system_prompt)
+                    
+                    # Step 3: Create and run the chain
+                    chain = prompt_template | llm
+                    answer = chain.invoke({
+                        "context": context_text,
+                        "question": prompt
+                    }).content
                     
                     st.session_state.chat_history.append({"role": "assistant", "content": answer})
                     with st.chat_message("assistant"):
                         st.markdown(answer)
                     
                     save_chat_history(st.session_state.chat_history)
-                    
+            
             except Exception as e:
                 error_msg = f"Sorry, I encountered an error: {str(e)}"
                 st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
@@ -585,6 +652,8 @@ elif mode == "💬 Ask Anything (Q&A)":
             st.session_state.chat_history = []
             save_chat_history([])
             st.rerun()
+        
+       
 
 elif mode == "📚 Upload Knowledge (RAG)":
     st.header("📚 Upload Knowledge for RAG")
